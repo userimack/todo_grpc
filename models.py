@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine, Column, Integer, Numeric, String, ForeignKey
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, validates
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = create_engine("mysql://root@localhost/todo", echo=True, echo_pool=True)
+engine = create_engine("mysql://root@localhost/todo", echo=True)
 Session = sessionmaker(bind=engine)
 session = Session()
 
@@ -23,6 +23,16 @@ class User(Base):
         return self.name
 
     todos = relationship("Todo", backref="user")
+
+    # @validates('email')
+    # def validate_email(self, key, address):
+        # assert '@' in address
+        # return address
+
+    # @validates('name')
+    # def validate_name(self, key, name):
+        # assert len(name) > 0
+        # return name
 
 
 class Todo(Base):

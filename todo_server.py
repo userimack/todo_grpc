@@ -2,10 +2,12 @@ from concurrent import futures
 import time
 import logging
 import sys
+from functools import wraps
 
 import grpc
 
-from todo_pb2 import Todo as Todo_pb2, User as User_pb2, UsersList, TodosList
+import todo_pb2
+from todo_pb2 import User as User_pb2, UsersList, TodosList
 import todo_pb2_grpc
 from models import session, User, Todo
 
@@ -16,25 +18,36 @@ logging.basicConfig(
 )
 
 
+def log_request(function):
+    @wraps(function)
+    def inner_function(*args, **kwargs):
+        logging.info("received request: {}".format(function.__name__))
+        resp = function(*args, **kwargs)
+        return resp
+    return inner_function
+
+
 class TodoService(todo_pb2_grpc.TodoServiceServicer):
 
+    @log_request
     def GetUsers(self, request, context):
         users = session.query(User).all()
         userslist_pb = []
         for user in users:
             userslist_pb.append(
-                User_pb2(
+                todo_pb2.User(
                     id=user.id,
                     name=user.name,
                     email=user.email
                 )
             )
-        return UsersList(users=userslist_pb)
+        return todo_pb2.UsersList(users=userslist_pb)
 
+    @log_request
     def GetUser(self, request, context):
         user_id = request.id
         user = session.query(User).filter(User.id == user_id).first()
-        user_pb2 = User_pb2()
+        user_pb2 = todo_pb2.User()
 
         if user:
             user_pb2.id = user.id
@@ -43,6 +56,7 @@ class TodoService(todo_pb2_grpc.TodoServiceServicer):
 
         return user_pb2
 
+    @log_request
     def GetUserTodos(self, request, context):
         user_id = request.id
         user = session.query(User).filter(User.id == user_id).first()
@@ -50,20 +64,44 @@ class TodoService(todo_pb2_grpc.TodoServiceServicer):
             todos = user.todos
             todos_pb2 = []
             for todo in todos:
-                todos_pb2.append(Todo_pb2(**self._row2dict(todo)))
+                todos_pb2.append(todo_pb2.Todo(**self._row2dict(todo)))
         else:
-            return TodosList()
+            return todo_pb2.TodosList()
 
         return TodosList(todos=todos_pb2)
 
+    @log_request
     def GetTodo(self, request, context):
-        pass
+        todo_id = request.id
+        todo = session.query(Todo).filter(Todo.id == todo_id).first()
+        if todo:
+            return todo_pb2.Todo(**self._row2dict(todo))
+        else:
+            return todo_pb2.Todo()
 
+    @log_request
     def CreateUser(self, request, context):
-        pass
+        user = User(name=request.name, email=request.name)
+        try:
+            session.add(user)
+            session.commit()
+        except:
+            logging.error("Didn't create user")
+        finally:
+            # if success returns with id else the request user sent
+            return todo_pb2.User(**self._row2dict(user))
 
+    @log_request
     def CreateTodo(self, request, context):
-        pass
+        todo = Todo(text=request.text, user_id=request.user_id, state=request.state)
+        try:
+            session.add(todo)
+            session.commit()
+        except:
+            logging.error("Didn't create todo")
+        finally:
+            # if success returns with id else the request user sent
+            return todo_pb2.User(**self._row2dict(todo))
 
     def _row2dict(self, row):
         row_dict = {}

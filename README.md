@@ -44,3 +44,26 @@ channel = grpc.insecure_channel(
 )
 stub = todo_pb2_grpc.TodoServiceStub(channel)
 ```
+
+### GetUsers
+```
+stub.GetUsers(todo_pb2.UsersRequest())
+```
+
+### GetUser
+`stub.GetUser(todo_pb2.User(id=1))`
+
+### GetUserTodos
+`stub.GetUserTodos(todo_pb2.User(id=1))`
+
+### GetTodo
+```
+stub.GetTodo(todo_pb2.Todo(id=3))
+```
+
+### CreateUser
+```
+user_req = todo_pb2.User(name="abc", email="ab@gmail.com")
+user_resp = stub.CreateUser(user_req)
+
+### CreateTodo
