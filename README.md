@@ -1,45 +1,46 @@
+## Todo application using grpc, protobuf, sqlalchemy (alembic)
+
+
+### Create a virtualenv and install dependencies
 ```
 mkvirtualenv alembic_sample --python=/usr/local/bin/python3
 pip install -r requirements.txt
 ```
+Create a mysql database: `todo`
 
-create a mysql database: `learn_alembic`
-Configure `alembic.ini` to update the `sqlalchemy.url` config.
+Configure `migrations/env.py` to update the `sqlalchemy.url` config if
+the default config is different from your local setup.
 
-### Create a new migration using alembic
+### Running the migrations
 ```
-alembic revision -m "create user table"
-```
-
-### Running the migration
-```
-# fill the upgrade and downgrade functions
 alembic upgrade head
 ```
 
-```
-alembic current # will show the current migration
-```
+### To run grpc server
+`python todo_server.py`
 
-```
-alembic revision -m "add age to users table"
-```
-### downgrading the migration
-```
-alembic downgrade <revision>
+### To generate pb2 and pb2_grpc files
+`python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. todo.proto`
 
-```
 
-```
-alembic revision -m "add address to users table"
-```
+### Connecting to grpc server from python terminal.
 
+This is how clients connect to grpc and call rpc methods.
 ```
-# I can directly downgrade to first migration
-```
+import grpc
 
+import todo_pb2, todo_pb2_grpc
+
+
+MAX_MESSAGE_LENGTH = 4 * 1024 * 1024 * 10
+options = [
+    ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+    ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH)
+]
+
+channel = grpc.insecure_channel(
+    'localhost:50051',
+    options=options,
+)
+stub = todo_pb2_grpc.TodoServiceStub(channel)
 ```
-# altering a column
-```
-```
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. todo.proto```
