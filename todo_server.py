@@ -3,11 +3,12 @@ import time
 import logging
 import sys
 from functools import wraps
+import traceback
 
 import grpc
 
 import todo_pb2
-from todo_pb2 import User as User_pb2, UsersList, TodosList
+from todo_pb2 import User as TodosList
 import todo_pb2_grpc
 from models import session, User, Todo
 
@@ -17,7 +18,6 @@ logging.basicConfig(
     format=log_format, datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-
 def log_request(function):
     @wraps(function)
     def inner_function(*args, **kwargs):
@@ -25,6 +25,10 @@ def log_request(function):
         resp = function(*args, **kwargs)
         return resp
     return inner_function
+
+
+def send_email(subject, body):
+    logging.info("Stub for sending mail.")
 
 
 class TodoService(todo_pb2_grpc.TodoServiceServicer):
@@ -72,12 +76,34 @@ class TodoService(todo_pb2_grpc.TodoServiceServicer):
 
     @log_request
     def GetTodo(self, request, context):
-        todo_id = request.id
-        todo = session.query(Todo).filter(Todo.id == todo_id).first()
-        if todo:
-            return todo_pb2.Todo(**self._row2dict(todo))
-        else:
-            return todo_pb2.Todo()
+        try:
+            if request.id == '':
+                error_message = 'Invalid Input: Todo id is required.'
+                logging.error(error_message)
+                context.set_details(error_message)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                return todo_pb2.Todo()
+
+            todo_id = request.id
+            todo = session.query(Todo).filter(Todo.id == todo_id).first()
+            if todo:
+                return todo_pb2.Todo(**self._row2dict(todo))
+            else:
+                error_message = 'Given Todo id is invalid.'
+                logging.error(error_message)
+                context.set_details(error_message)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        except Exception as e:
+            error_message = str(e)
+            error_message_traceback = traceback.format_exc()
+
+            logging.error(error_message_traceback)
+            context.set_details(error_message)
+            context.set_code(grpc.StatusCode.UNKNOWN)
+
+            send_email(subject=error_message, body=error_message_traceback)
+
+        return todo_pb2.Todo()
 
     @log_request
     def CreateUser(self, request, context):
@@ -85,7 +111,7 @@ class TodoService(todo_pb2_grpc.TodoServiceServicer):
         try:
             session.add(user)
             session.commit()
-        except:
+        except Exception:
             logging.error("Didn't create user")
         finally:
             # if success returns with id else the request user sent
@@ -97,7 +123,7 @@ class TodoService(todo_pb2_grpc.TodoServiceServicer):
         try:
             session.add(todo)
             session.commit()
-        except:
+        except Exception:
             logging.error("Didn't create todo")
         finally:
             # if success returns with id else the request user sent
